@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/domain.test.mjs tests/persistence.test.mjs tests/notifications.test.mjs tests/grid-edit.test.mjs",
+    "test": "node --test tests/domain.test.mjs tests/persistence.test.mjs tests/notifications.test.mjs tests/grid-edit.test.mjs tests/inventory.test.mjs tests/reminder-sync.test.mjs",
     "test:ui": "playwright test"
   },
   "dependencies": {

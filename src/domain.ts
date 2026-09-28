@@ -1,3 +1,4 @@
+import type { InventoryFields } from './inventory.ts';
 export type Home = { id: string; name: string; greeting?: string; note?: string };
 export const DEFAULT_HOME_GREETING = '今天也要把家照顾好';
 export const DEFAULT_HOME_NOTE = '喵今天好好收纳了吗';
@@ -12,7 +13,7 @@ export function isValidRoomLayout(layout: RoomLayout | undefined): boolean {
     && layout.cols >= ROOM_DIMENSION_MIN && layout.cols <= ROOM_DIMENSION_MAX;
 }
 export type Container = { id: string; name: string; roomId: string; parentId?: string; level: 2 | 3; cells: number[]; color?: string };
-export type Item = { id: string; name: string; roomId: string; containerId?: string; categoryId: string; subcategoryId?: string; cell?: number; expiry?: string; reminderDays: number };
+export type Item = InventoryFields & { id: string; name: string; roomId: string; containerId?: string; categoryId: string; subcategoryId?: string; cell?: number; expiry?: string; reminderDays: number };
 export type Category = { id: string; name: string; isSystem: boolean; allowSubcategories: boolean };
 export type Subcategory = { id: string; name: string; parentCategoryId: string };
 export type Location = { roomId: string; containerId?: string };
@@ -67,6 +68,7 @@ export function remainingDays(expiry: string | undefined, now = new Date()) {
 }
 export function matchesFilter(item: Item, filter: Filter, now = new Date()) {
   if (filter === 'all') return true;
+  if (item.quantity === 0) return false;
   const days = remainingDays(item.expiry, now);
   return days !== null && (filter === 'expired' ? days < 0 : days >= 0 && days <= (filter === 'week' ? 7 : 30));
 }
@@ -158,8 +160,8 @@ export function createInitialData() {
     { id: 'drawer', name: '第二层抽屉', roomId: 'kitchen', parentId: 'cabinet', level: 3, cells: [0, 1, 8, 9] },
   ];
   const items: Item[] = [
-    { id: 'tea', name: '乌龙茶', roomId: 'kitchen', containerId: 'drawer', categoryId: 'drink', cell: 18, expiry: localDate(expiry), reminderDays: 7 },
-    { id: 'bandage', name: '创可贴', roomId: 'bedroom', categoryId: 'medicine', reminderDays: 7 },
+    { id: 'tea', name: '乌龙茶', roomId: 'kitchen', containerId: 'drawer', quantity: 1, unit: '份', inventoryType: null, categoryId: 'drink', cell: 18, expiry: localDate(expiry), reminderDays: 7 },
+    { id: 'bandage', name: '创可贴', roomId: 'bedroom', quantity: 1, unit: '份', inventoryType: null, categoryId: 'medicine', reminderDays: 7 },
   ];
   const categories: Category[] = [['food', '食物'], ['drink', '饮品'], ['medicine', '药品'], ['cleaning', '清洁用品'], ['clothes', '衣物'], ['tools', '工具'], ['documents', '文件'], ['other', '其他'], ['uncategorized', '未分类']].map(([id, name]) => ({ id, name, isSystem: id === 'uncategorized', allowSubcategories: id !== 'uncategorized' }));
   return { homes, rooms, containers, items, categories, subcategories: DEFAULT_SUBCATEGORIES.map(subcategory => ({ ...subcategory })) };

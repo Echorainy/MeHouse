@@ -4,7 +4,7 @@ import { decodeSnapshot, encodeSnapshot, emptySnapshot, migrateSnapshot } from '
 import { DEFAULT_MODULE_COLOR, normalizeModuleColor } from '../src/domain.ts';
 
 test('encodes and decodes all app collections without losing nested layout data', () => {
-  const input = { homes: [{ id: 'h', name: '我的家', greeting: '今天也要把家照顾好', note: '喵今天好好收纳了吗' }], rooms: [{ id: 'r', homeId: 'h', name: '厨房', layout: { rows: 8, cols: 8 } }], containers: [{ id: 'c', roomId: 'r', name: '橱柜', level: 3, cells: [1, 2] }], items: [{ id: 'i', name: '茶', roomId: 'r', categoryId: 'drink', subcategoryId: 'tea', containerId: 'c', cell: 1, expiry: '2026-09-24', reminderDays: 7 }], categories: [{ id: 'drink', name: '饮品', isSystem: false, allowSubcategories: true }], subcategories: [{ id: 'tea', name: '茶', parentCategoryId: 'drink' }] };
+  const input = { homes: [{ id: 'h', name: '我的家', greeting: '今天也要把家照顾好', note: '喵今天好好收纳了吗' }], rooms: [{ id: 'r', homeId: 'h', name: '厨房', layout: { rows: 8, cols: 8 } }], containers: [{ id: 'c', roomId: 'r', name: '橱柜', level: 3, cells: [1, 2] }], items: [{ id: 'i', name: '茶', quantity: 1, unit: '份', inventoryType: null, roomId: 'r', categoryId: 'drink', subcategoryId: 'tea', containerId: 'c', cell: 1, expiry: '2026-09-24', reminderDays: 7 }], categories: [{ id: 'drink', name: '饮品', isSystem: false, allowSubcategories: true }], subcategories: [{ id: 'tea', name: '茶', parentCategoryId: 'drink' }] };
   assert.deepEqual(decodeSnapshot(encodeSnapshot(input)), input);
 });
 

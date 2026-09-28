@@ -1,3 +1,4 @@
+import { normalizeInventory } from './inventory.ts';
 import { createInitialData } from './domain.ts';
 import { DEFAULT_HOME_GREETING, DEFAULT_HOME_NOTE, DEFAULT_SUBCATEGORIES, isValidRoomLayout, itemUsesGrid } from './domain.ts';
 import type { Category, Container, Home, Item, Room, Subcategory } from './domain.ts';
@@ -5,7 +6,7 @@ import type { Category, Container, Home, Item, Room, Subcategory } from './domai
 export type Snapshot = { homes: Home[]; rooms: Room[]; containers: Container[]; items: Item[]; categories: Category[]; subcategories: Subcategory[] };
 export const emptySnapshot = (): Snapshot => createInitialData();
 
-export function encodeSnapshot(snapshot: Snapshot) { return JSON.stringify(snapshot); }
+export function encodeSnapshot(snapshot: Snapshot) { return JSON.stringify({ ...snapshot, items: snapshot.items.map(normalizeInventory) }); }
 export function decodeSnapshot(value: string): Snapshot {
   const parsed = JSON.parse(value);
   if (!isSnapshot(parsed)) throw new Error('Invalid snapshot');
@@ -32,7 +33,8 @@ export function decodeSnapshot(value: string): Snapshot {
     subcategories: normalizedSubcategories,
     homes: parsed.homes.map(home => ({ ...home, greeting: home.greeting ?? DEFAULT_HOME_GREETING, note: home.note ?? DEFAULT_HOME_NOTE })),
     containers: parsed.containers.map(container => ({ ...container, cells: [...new Set(container.cells)] })),
-    items: parsed.items.map(item => {
+    items: parsed.items.map(rawItem => {
+      const item = normalizeInventory(rawItem);
       const clothingWasRemoved = item.categoryId === 'clothes' && !normalizedCategoryIds.has('clothes');
       const normalized = clothingWasRemoved
         ? (() => { const { subcategoryId: _subcategoryId, ...withoutSubcategory } = item; return { ...withoutSubcategory, categoryId: 'uncategorized' }; })()

@@ -1,3 +1,4 @@
+import type { ReminderLedger } from './reminder-sync';
 import * as SQLite from 'expo-sqlite';
 import { Snapshot, decodeSnapshot, emptySnapshot, encodeSnapshot } from './persistence';
 
@@ -14,4 +15,16 @@ export async function loadSnapshot(): Promise<Snapshot> {
 export async function saveSnapshot(snapshot: Snapshot) {
   const db = await database();
   await db.runAsync('INSERT OR REPLACE INTO app_state (id, snapshot, updated_at) VALUES (1, ?, ?)', encodeSnapshot(snapshot), new Date().toISOString());
+}
+
+export async function loadReminderLedger(): Promise<ReminderLedger> {
+  const db = await database();
+  await db.execAsync('CREATE TABLE IF NOT EXISTS reminder_state (id INTEGER PRIMARY KEY NOT NULL, value TEXT NOT NULL);');
+  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM reminder_state WHERE id = 1');
+  const value = JSON.parse(row?.value ?? '{}');
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+export async function saveReminderLedger(value: ReminderLedger) {
+  const db = await database();
+  await db.runAsync('INSERT OR REPLACE INTO reminder_state (id, value) VALUES (1, ?)', JSON.stringify(value));
 }

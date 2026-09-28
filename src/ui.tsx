@@ -13,8 +13,8 @@ export function Icon({ name, color = colors.ink }: { name: IconName; color?: str
 export function IconButton({ name, label, onPress }: { name: IconName; label: string; onPress: () => void }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={s.iconButton}><Icon name={name} /></Pressable>;
 }
-export function Button({ title, onPress, secondary = false, icon, disabled = false }: { title: string; onPress: () => void; secondary?: boolean; icon?: IconName; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={title} disabled={disabled} onPress={onPress} style={[s.button, secondary && s.secondary, disabled && { opacity: .4 }]}>{icon && <Icon name={icon} color={secondary ? colors.accent : '#FFF'} />}<Text style={[s.buttonText, secondary && { color: colors.accent }]}>{title}</Text></Pressable>;
+export function Button({ title, label, onPress, secondary = false, icon, disabled = false }: { title: string; label?: string; onPress: () => void; secondary?: boolean; icon?: IconName; disabled?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label ?? title} disabled={disabled} onPress={onPress} style={[s.button, secondary && s.secondary, disabled && { opacity: .4 }]}>{icon && <Icon name={icon} color={secondary ? colors.accent : '#FFF'} />}<Text style={[s.buttonText, secondary && { color: colors.accent }]}>{title}</Text></Pressable>;
 }
 export function Chip({ label, selected, onPress, tone, variant, interactive = true }: { label: string; selected: boolean; onPress: () => void; tone?: LocationTone; variant?: 'primaryCategory' | 'secondaryCategory'; interactive?: boolean }) {
   const palette = tone ? LOCATION_TONES[tone] : undefined;
@@ -25,6 +25,15 @@ export function Chip({ label, selected, onPress, tone, variant, interactive = tr
   const content = <Text style={{ color: textColor, fontWeight: selected ? '700' : '400' }}>{label}</Text>;
   if (!interactive) return <View accessibilityLabel={label} style={style}>{content}</View>;
   return <Pressable {...({ 'aria-checked': selected } as any)} accessibilityRole="radio" accessibilityState={{ checked: selected }} accessibilityLabel={label} onPress={onPress} style={style}>{content}</Pressable>;
+}
+export function FilterGroup({ title, summary, defaultExpanded = false, children }: { title: string; summary: string; defaultExpanded?: boolean; children: React.ReactNode }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  return <View style={{ gap: 8 }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${expanded ? '收起' : '展开'}${title}筛选`} accessibilityState={{ expanded }} onPress={() => setExpanded(value => !value)} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+      <Text style={s.label}>{title}</Text><Text numberOfLines={1} style={[s.muted, { flex: 1, minWidth: 0, textAlign: 'right' }]}>{summary}</Text><Icon name={expanded ? 'chevron-up' : 'chevron-down'} color={colors.muted} />
+    </Pressable>
+    {expanded && <View style={{ gap: 12 }}>{children}</View>}
+  </View>;
 }
 export function Field({ label, value, onChangeText, placeholder, numeric = false, containerStyle }: { label: string; value: string; onChangeText: (v: string) => void; placeholder?: string; numeric?: boolean; containerStyle?: StyleProp<ViewStyle> }) {
   return <View style={[s.field, containerStyle]}><Text style={s.label}>{label}</Text><TextInput accessibilityLabel={label} style={s.input} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#81918A" keyboardType={numeric ? 'number-pad' : 'default'} /></View>;

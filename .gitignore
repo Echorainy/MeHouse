@@ -11,3 +11,7 @@ playwright-report/
 .eas-pnpm-store/
 dist-check-android/
 dist-check-ios/
+dist-speech-check/
+dist-wardrobe-check/
+wardrobe_local_tool/
+.env.local

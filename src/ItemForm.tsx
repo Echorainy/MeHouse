@@ -1,3 +1,5 @@
+import { InventoryEditor, inventoryDraft } from './InventoryUI';
+import { parseCount, validateInventory, normalizeInventory } from './inventory';
 import React, { useState } from 'react';
 import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -5,6 +7,7 @@ import { Category, Container, Item, Location, Room, Subcategory, directChildren,
 import { Button, Chip, Field, Sheet, colors, s } from './ui';
 
 export function ItemForm({ rooms, containers, categories, subcategories, initialLocation, item, onClose, onSave }: { rooms: Room[]; containers: Container[]; categories: Category[]; subcategories: Subcategory[]; initialLocation?: Location; item?: Item; onClose: () => void; onSave: (item: Omit<Item, 'id'>, id?: string) => string | null }) {
+  const [inventory, setInventory] = useState(() => inventoryDraft(item));
   const [name, setName] = useState(item?.name ?? ''); const [categoryId, setCategoryId] = useState(item?.categoryId ?? 'uncategorized'); const [subcategoryId, setSubcategoryId] = useState(item?.subcategoryId);
   const [place, setPlace] = useState<Location | undefined>(item ? { roomId: item.roomId, containerId: item.containerId } : initialLocation);
   const [withExpiry, setWithExpiry] = useState(!!item?.expiry); const [mode, setMode] = useState<'direct' | 'calculated'>('direct');
@@ -23,8 +26,17 @@ export function ItemForm({ rooms, containers, categories, subcategories, initial
         start.setDate(start.getDate() + length); expiry = localDate(start);
       }
     }
+    const inventoryFields = {
+      inventoryType: inventory.inventoryType, quantity: parseCount(inventory.quantity) ?? NaN, unit: inventory.unit.trim(),
+      restockThreshold: parseCount(inventory.threshold) ?? NaN,
+      maintenanceDate: inventory.maintenance ? inventory.date : undefined,
+      maintenanceLeadDays: parseCount(inventory.lead) ?? NaN, lastMaintenanceDate: item?.lastMaintenanceDate,
+    };
+    if (inventory.inventoryType === 'durable' && inventory.maintenance && !inventory.date) return setError('请选择检修日期');
+    const inventoryError = validateInventory(inventoryFields, !!item && !item.inventoryType && !inventory.inventoryType);
+    if (inventoryError) return setError(inventoryError);
     const selectedSubcategory = subcategories.some(subcategory => subcategory.id === subcategoryId && subcategory.parentCategoryId === categoryId) ? subcategoryId : undefined;
-    const message = onSave({ name: name.trim(), categoryId, subcategoryId: selectedSubcategory, ...place, expiry, reminderDays: item?.reminderDays ?? 7, cell: item?.cell }, item?.id);
+    const message = onSave({ ...normalizeInventory(inventoryFields), name: name.trim(), categoryId, subcategoryId: selectedSubcategory, ...place, expiry, reminderDays: item?.reminderDays ?? 7, cell: item?.cell }, item?.id);
     if (message) setError(message);
   };
   const moduleOptions = place ? directChildren(containers, place.roomId) : [];
@@ -39,6 +51,7 @@ export function ItemForm({ rooms, containers, categories, subcategories, initial
   return <Sheet title={item ? '编辑物品' : '记录物品'} onClose={onClose}>
     <View testID="item-form-stack" style={s.itemFormStack}>
       <View style={s.itemFormSection}><Field label="物品名称" value={name} onChangeText={setName} containerStyle={s.itemFormField} /></View>
+      <InventoryEditor draft={inventory} onChange={setInventory} />
       <View testID="item-form-section-room" style={s.itemFormSection}><Text style={s.label}>房间</Text><View style={s.wrap}>{rooms.map(room => <Chip key={room.id} label={room.name} tone="room" selected={place?.roomId === room.id} onPress={() => setPlace({ roomId: room.id })} />)}</View></View>
       {place && <View testID="item-form-section-location" style={s.itemFormSection}><Text style={s.label}>存放位置</Text><View style={s.itemFormSubsection}><View style={s.wrap}><Chip label="直接放在房间" tone="neutral" selected={!place.containerId} onPress={() => setPlace({ roomId: place.roomId })} />{moduleOptions.map(c => <Chip key={c.id} label={c.name} tone="module" selected={parentId === c.id} onPress={() => setPlace({ roomId: place.roomId, containerId: c.id })} />)}</View>{!!children.length && <View style={s.wrap}>{children.map(c => <Chip key={c.id} label={c.name} tone="submodule" selected={place.containerId === c.id} onPress={() => setPlace({ roomId: place.roomId, containerId: c.id })} />)}</View>}</View></View>}
       <View testID="item-form-section-category" style={s.itemFormSection}><Text style={s.label}>分类标签</Text><View style={s.wrap}>{categories.map(c => <Chip key={c.id} label={c.name} variant="primaryCategory" selected={categoryId === c.id} onPress={() => selectCategory(c.id)} />)}</View>{!!categoryChildren.length && <View style={s.itemFormSubsection}><Text style={s.label}>二级分类（可选）</Text><View style={s.wrap}><Chip label="仅一级分类" variant="secondaryCategory" selected={!subcategoryId} onPress={() => setSubcategoryId(undefined)} />{categoryChildren.map(subcategory => <Chip key={subcategory.id} label={subcategory.name} variant="secondaryCategory" selected={subcategoryId === subcategory.id} onPress={() => setSubcategoryId(subcategory.id)} />)}</View></View>}</View>
