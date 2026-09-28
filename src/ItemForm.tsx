@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Category, Container, Item, Location, Room, directChildren, localDate, parseDate } from './domain';
+import { Category, Container, Item, Location, Room, Subcategory, directChildren, localDate, parseDate } from './domain';
 import { Button, Chip, Field, Sheet, colors, s } from './ui';
 
-export function ItemForm({ rooms, containers, categories, initialLocation, item, onClose, onSave }: { rooms: Room[]; containers: Container[]; categories: Category[]; initialLocation?: Location; item?: Item; onClose: () => void; onSave: (item: Omit<Item, 'id'>, id?: string) => string | null }) {
-  const [name, setName] = useState(item?.name ?? ''); const [categoryId, setCategoryId] = useState(item?.categoryId ?? 'uncategorized');
+export function ItemForm({ rooms, containers, categories, subcategories, initialLocation, item, onClose, onSave }: { rooms: Room[]; containers: Container[]; categories: Category[]; subcategories: Subcategory[]; initialLocation?: Location; item?: Item; onClose: () => void; onSave: (item: Omit<Item, 'id'>, id?: string) => string | null }) {
+  const [name, setName] = useState(item?.name ?? ''); const [categoryId, setCategoryId] = useState(item?.categoryId ?? 'uncategorized'); const [subcategoryId, setSubcategoryId] = useState(item?.subcategoryId);
   const [place, setPlace] = useState<Location | undefined>(item ? { roomId: item.roomId, containerId: item.containerId } : initialLocation);
   const [withExpiry, setWithExpiry] = useState(!!item?.expiry); const [mode, setMode] = useState<'direct' | 'calculated'>('direct');
   const [date, setDate] = useState(item?.expiry ?? ''); const [production, setProduction] = useState(''); const [days, setDays] = useState(''); const [error, setError] = useState(''); const [picker, setPicker] = useState<'expiry' | 'production'>();
@@ -23,20 +23,27 @@ export function ItemForm({ rooms, containers, categories, initialLocation, item,
         start.setDate(start.getDate() + length); expiry = localDate(start);
       }
     }
-    const message = onSave({ name: name.trim(), categoryId, ...place, expiry, reminderDays: item?.reminderDays ?? 7, cell: item?.cell }, item?.id);
+    const selectedSubcategory = subcategories.some(subcategory => subcategory.id === subcategoryId && subcategory.parentCategoryId === categoryId) ? subcategoryId : undefined;
+    const message = onSave({ name: name.trim(), categoryId, subcategoryId: selectedSubcategory, ...place, expiry, reminderDays: item?.reminderDays ?? 7, cell: item?.cell }, item?.id);
     if (message) setError(message);
   };
   const moduleOptions = place ? directChildren(containers, place.roomId) : [];
   const selected = containers.find(c => c.id === place?.containerId);
   const parentId = selected?.level === 3 ? selected.parentId : selected?.id;
   const children = place && parentId ? directChildren(containers, place.roomId, parentId) : [];
+  const categoryChildren = subcategories.filter(subcategory => subcategory.parentCategoryId === categoryId);
+  const selectCategory = (nextCategoryId: string) => {
+    setCategoryId(nextCategoryId);
+    setSubcategoryId(current => subcategories.some(subcategory => subcategory.id === current && subcategory.parentCategoryId === nextCategoryId) ? current : undefined);
+  };
   return <Sheet title={item ? '编辑物品' : '记录物品'} onClose={onClose}>
-    <Field label="物品名称" value={name} onChangeText={setName} />
-    <Text style={s.label}>房间</Text><View style={s.wrap}>{rooms.map(room => <Chip key={room.id} label={room.name} tone="room" selected={place?.roomId === room.id} onPress={() => setPlace({ roomId: room.id })} />)}</View>
-    {place && <><Text style={[s.label, { marginVertical: 10 }]}>存放位置</Text><View style={s.wrap}><Chip label="直接放在房间" tone="neutral" selected={!place.containerId} onPress={() => setPlace({ roomId: place.roomId })} />{moduleOptions.map(c => <Chip key={c.id} label={c.name} tone="module" selected={parentId === c.id} onPress={() => setPlace({ roomId: place.roomId, containerId: c.id })} />)}</View>{!!children.length && <View style={[s.wrap, { marginTop: 8 }]}>{children.map(c => <Chip key={c.id} label={c.name} tone="submodule" selected={place.containerId === c.id} onPress={() => setPlace({ roomId: place.roomId, containerId: c.id })} />)}</View>}</>}
-    <Text style={[s.label, { marginVertical: 10 }]}>分类标签</Text><View style={s.wrap}>{categories.map(c => <Chip key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(c.id)} />)}</View>
-    <Text style={[s.label, { marginVertical: 10 }]}>保质期</Text><View style={s.wrap}><Chip label="不设置保质期" selected={!withExpiry} onPress={() => setWithExpiry(false)} /><Chip label="设置保质期" selected={withExpiry} onPress={() => setWithExpiry(true)} /></View>
-    {withExpiry && <><View style={[s.wrap, { marginTop: 12 }]}><Chip label="选择过期日" selected={mode === 'direct'} onPress={() => setMode('direct')} /><Chip label="生产日期 + 天数" selected={mode === 'calculated'} onPress={() => setMode('calculated')} /></View>{mode === 'direct' ? <View style={s.field}><Text style={s.label}>过期日期</Text>{dateField('过期日期', date, 'expiry', setDate)}</View> : <><View style={s.field}><Text style={s.label}>生产日期</Text>{dateField('生产日期', production, 'production', setProduction)}</View><Field label="保质期天数" value={days} onChangeText={setDays} numeric /></>}</>}
-    {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}<Button title={item ? '保存修改' : '保存物品'} onPress={save} />
+    <View testID="item-form-stack" style={s.itemFormStack}>
+      <View style={s.itemFormSection}><Field label="物品名称" value={name} onChangeText={setName} containerStyle={s.itemFormField} /></View>
+      <View testID="item-form-section-room" style={s.itemFormSection}><Text style={s.label}>房间</Text><View style={s.wrap}>{rooms.map(room => <Chip key={room.id} label={room.name} tone="room" selected={place?.roomId === room.id} onPress={() => setPlace({ roomId: room.id })} />)}</View></View>
+      {place && <View testID="item-form-section-location" style={s.itemFormSection}><Text style={s.label}>存放位置</Text><View style={s.itemFormSubsection}><View style={s.wrap}><Chip label="直接放在房间" tone="neutral" selected={!place.containerId} onPress={() => setPlace({ roomId: place.roomId })} />{moduleOptions.map(c => <Chip key={c.id} label={c.name} tone="module" selected={parentId === c.id} onPress={() => setPlace({ roomId: place.roomId, containerId: c.id })} />)}</View>{!!children.length && <View style={s.wrap}>{children.map(c => <Chip key={c.id} label={c.name} tone="submodule" selected={place.containerId === c.id} onPress={() => setPlace({ roomId: place.roomId, containerId: c.id })} />)}</View>}</View></View>}
+      <View testID="item-form-section-category" style={s.itemFormSection}><Text style={s.label}>分类标签</Text><View style={s.wrap}>{categories.map(c => <Chip key={c.id} label={c.name} variant="primaryCategory" selected={categoryId === c.id} onPress={() => selectCategory(c.id)} />)}</View>{!!categoryChildren.length && <View style={s.itemFormSubsection}><Text style={s.label}>二级分类（可选）</Text><View style={s.wrap}><Chip label="仅一级分类" variant="secondaryCategory" selected={!subcategoryId} onPress={() => setSubcategoryId(undefined)} />{categoryChildren.map(subcategory => <Chip key={subcategory.id} label={subcategory.name} variant="secondaryCategory" selected={subcategoryId === subcategory.id} onPress={() => setSubcategoryId(subcategory.id)} />)}</View></View>}</View>
+      <View testID="item-form-section-expiry" style={s.itemFormSection}><Text style={s.label}>保质期</Text><View style={s.wrap}><Chip label="不设置保质期" selected={!withExpiry} onPress={() => setWithExpiry(false)} /><Chip label="设置保质期" selected={withExpiry} onPress={() => setWithExpiry(true)} /></View>{withExpiry && <View style={s.itemFormSubsection}><View style={s.wrap}><Chip label="选择过期日" selected={mode === 'direct'} onPress={() => setMode('direct')} /><Chip label="生产日期 + 天数" selected={mode === 'calculated'} onPress={() => setMode('calculated')} /></View>{mode === 'direct' ? <View style={s.itemFormFieldGroup}><Text style={s.label}>过期日期</Text>{dateField('过期日期', date, 'expiry', setDate)}</View> : <><View style={s.itemFormFieldGroup}><Text style={s.label}>生产日期</Text>{dateField('生产日期', production, 'production', setProduction)}</View><Field label="保质期天数" value={days} onChangeText={setDays} numeric containerStyle={s.itemFormField} /></>}</View>}</View>
+      {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}<Button title={item ? '保存修改' : '保存物品'} onPress={save} />
+    </View>
   </Sheet>;
 }

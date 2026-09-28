@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_MODULE_COLOR, LOCATION_TONES, MODULE_COLORS, isValidHexColor, moduleColorTextColor, normalizeModuleColor, remainingDays, statistics, homeItems, locationPath, validateName, directChildren, directItems, containerDescendants, removeContainerContents, removeHomeContents, filterItems, matchesCategory } from '../src/domain.ts';
+import { DEFAULT_MODULE_COLOR, LOCATION_TONES, MODULE_COLORS, createInitialData, isValidHexColor, moduleColorTextColor, normalizeModuleColor, remainingDays, statistics, homeItems, locationPath, validateName, directChildren, directItems, containerDescendants, removeContainerContents, removeHomeContents, filterItems, matchesCategory, removeSubcategoryAndMaybeCategory, isValidRoomLayout } from '../src/domain.ts';
 
 const now = new Date(2026, 8, 24, 23, 59);
 const dates = ['2026-09-23', '2026-09-24', '2026-10-01', '2026-10-02', '2026-10-24', '2026-10-25', undefined];
@@ -83,6 +83,32 @@ test('location tones provide distinct soft colors for each placement level', () 
   assert.deepEqual(LOCATION_TONES.submodule, { background: '#E6D2D0', border: '#AC8584', text: '#704F50' });
 });
 
+test('initial directly placed items have no grid cell', () => {
+  const initial = createInitialData();
+  const directItems = initial.items.filter(item => !item.containerId);
+  assert.ok(directItems.length > 0);
+  assert.ok(directItems.every(item => !('cell' in item)));
+});
+
+test('initial data includes food and clothing subcategories', () => {
+  const initial = createInitialData();
+  assert.equal(initial.categories.find(category => category.id === 'food')?.name, '食物');
+  assert.equal(initial.categories.find(category => category.id === 'clothes')?.name, '衣物');
+  assert.deepEqual(initial.subcategories.filter(subcategory => subcategory.parentCategoryId === 'food').map(subcategory => subcategory.name), ['主食', '蔬菜', '水果', '零食', '饮料', '肉类']);
+  assert.deepEqual(initial.subcategories.filter(subcategory => subcategory.parentCategoryId === 'clothes').map(subcategory => subcategory.name), ['上衣', '下衣', '连体', '配饰']);
+  assert.ok(initial.categories.filter(category => category.id !== 'uncategorized').every(category => category.allowSubcategories));
+  assert.equal(initial.categories.find(category => category.id === 'uncategorized')?.allowSubcategories, false);
+});
+
+test('room layouts accept integer dimensions from 6 through 12 only', () => {
+  assert.equal(isValidRoomLayout({ rows: 6, cols: 12 }), true);
+  assert.equal(isValidRoomLayout({ rows: 8, cols: 8 }), true);
+  assert.equal(isValidRoomLayout({ rows: 12, cols: 6 }), true);
+  for (const layout of [{ rows: 5, cols: 8 }, { rows: 8, cols: 13 }, { rows: 6.5, cols: 8 }, { rows: 8, cols: 0 }]) {
+    assert.equal(isValidRoomLayout(layout), false);
+  }
+});
+
 test('removing a home removes only its rooms, modules, and items', () => {
   const data = { homes: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], rooms: [{ id: 'ar', homeId: 'a' }, { id: 'br', homeId: 'b' }], containers: [{ id: 'ac', roomId: 'ar' }, { id: 'bc', roomId: 'br' }], items: [{ id: 'ai', roomId: 'ar' }, { id: 'bi', roomId: 'br' }] };
   assert.deepEqual(removeHomeContents(data, 'a'), { homes: [{ id: 'b', name: 'B' }], rooms: [{ id: 'br', homeId: 'b' }], containers: [{ id: 'bc', roomId: 'br' }], items: [{ id: 'bi', roomId: 'br' }] });
@@ -101,4 +127,39 @@ test('category filters combine with expiry filters', () => {
   assert.deepEqual(filterItems(sample, 'all', 'drink', now).map(i => i.id), ['a', 'b']);
   assert.deepEqual(filterItems(sample, 'week', 'drink', now).map(i => i.id), ['a', 'b']);
   assert.deepEqual(filterItems(sample, 'expired', undefined, now).map(i => i.id), ['c']);
+});
+
+test('subcategory filters match the selected parent and child', () => {
+  const sample = [
+    { id: 'a', categoryId: 'food', subcategoryId: 'snacks', expiry: '2026-09-24' },
+    { id: 'b', categoryId: 'food', subcategoryId: 'fruit', expiry: '2026-10-01' },
+    { id: 'c', categoryId: 'clothes', subcategoryId: 'tops', expiry: '2026-09-23' },
+  ];
+  assert.deepEqual(filterItems(sample, 'all', 'food', now, 'snacks').map(i => i.id), ['a']);
+  assert.deepEqual(filterItems(sample, 'all', 'food', now, 'missing').map(i => i.id), []);
+  assert.deepEqual(filterItems(sample, 'all', 'food', now).map(i => i.id), ['a', 'b']);
+});
+
+test('deleting the last clothing subcategory removes clothing and reclassifies its items', () => {
+  const result = removeSubcategoryAndMaybeCategory(
+    [{ id: 'clothes', name: '衣物', isSystem: false }, { id: 'food', name: '食物', isSystem: false }, { id: 'uncategorized', name: '未分类', isSystem: true }],
+    [{ id: 'top', name: '上衣', parentCategoryId: 'clothes' }],
+    [{ id: 'a', categoryId: 'clothes', subcategoryId: 'top' }, { id: 'b', categoryId: 'food' }],
+    'top',
+  );
+  assert.deepEqual(result.categories.map(category => category.id), ['food', 'uncategorized']);
+  assert.deepEqual(result.subcategories, []);
+  assert.deepEqual(result.items, [{ id: 'a', categoryId: 'uncategorized' }, { id: 'b', categoryId: 'food' }]);
+});
+
+test('deleting a non-clothing last subcategory keeps its parent category', () => {
+  const result = removeSubcategoryAndMaybeCategory(
+    [{ id: 'food', name: '食物', isSystem: false }, { id: 'uncategorized', name: '未分类', isSystem: true }],
+    [{ id: 'fruit', name: '水果', parentCategoryId: 'food' }],
+    [{ id: 'a', categoryId: 'food', subcategoryId: 'fruit' }],
+    'fruit',
+  );
+  assert.deepEqual(result.categories.map(category => category.id), ['food', 'uncategorized']);
+  assert.deepEqual(result.subcategories, []);
+  assert.deepEqual(result.items, [{ id: 'a', categoryId: 'food' }]);
 });

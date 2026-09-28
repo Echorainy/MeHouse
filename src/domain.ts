@@ -1,10 +1,20 @@
 export type Home = { id: string; name: string; greeting?: string; note?: string };
 export const DEFAULT_HOME_GREETING = '今天也要把家照顾好';
 export const DEFAULT_HOME_NOTE = '喵今天好好收纳了吗';
-export type Room = { id: string; homeId: string; name: string; layout: { rows: 8; cols: 8 } };
+export type RoomLayout = { rows: number; cols: number };
+export type Room = { id: string; homeId: string; name: string; layout: RoomLayout };
+export const ROOM_DIMENSION_MIN = 6;
+export const ROOM_DIMENSION_MAX = 12;
+export const ROOM_SIZE_PRESETS = [6, 8, 10, 12] as const;
+export function isValidRoomLayout(layout: RoomLayout | undefined): boolean {
+  return !!layout && Number.isInteger(layout.rows) && Number.isInteger(layout.cols)
+    && layout.rows >= ROOM_DIMENSION_MIN && layout.rows <= ROOM_DIMENSION_MAX
+    && layout.cols >= ROOM_DIMENSION_MIN && layout.cols <= ROOM_DIMENSION_MAX;
+}
 export type Container = { id: string; name: string; roomId: string; parentId?: string; level: 2 | 3; cells: number[]; color?: string };
-export type Item = { id: string; name: string; roomId: string; containerId?: string; categoryId: string; cell?: number; expiry?: string; reminderDays: number };
-export type Category = { id: string; name: string; isSystem: boolean };
+export type Item = { id: string; name: string; roomId: string; containerId?: string; categoryId: string; subcategoryId?: string; cell?: number; expiry?: string; reminderDays: number };
+export type Category = { id: string; name: string; isSystem: boolean; allowSubcategories: boolean };
+export type Subcategory = { id: string; name: string; parentCategoryId: string };
 export type Location = { roomId: string; containerId?: string };
 export type LocationTone = 'neutral' | 'room' | 'module' | 'submodule';
 export const LOCATION_TONES: Record<LocationTone, { background: string; border: string; text: string }> = {
@@ -17,6 +27,18 @@ export type Filter = 'all' | 'month' | 'week' | 'expired';
 export const filterLabels: Record<Filter, string> = { all: '全部物品', month: '30 天内过期', week: '7 天内过期', expired: '已过期' };
 export const MODULE_COLORS = ['#D6B59A', '#C98F7A', '#C9A0A0', '#D2AAA0', '#A3AD96', '#A59D7A', '#D4BE8D', '#B4A393'] as const;
 export const DEFAULT_MODULE_COLOR = '#A3AD96';
+export const DEFAULT_SUBCATEGORIES: ReadonlyArray<Subcategory> = [
+  { id: 'food-staple', name: '主食', parentCategoryId: 'food' },
+  { id: 'food-vegetable', name: '蔬菜', parentCategoryId: 'food' },
+  { id: 'food-fruit', name: '水果', parentCategoryId: 'food' },
+  { id: 'food-snack', name: '零食', parentCategoryId: 'food' },
+  { id: 'food-drink', name: '饮料', parentCategoryId: 'food' },
+  { id: 'food-meat', name: '肉类', parentCategoryId: 'food' },
+  { id: 'clothes-top', name: '上衣', parentCategoryId: 'clothes' },
+  { id: 'clothes-bottom', name: '下衣', parentCategoryId: 'clothes' },
+  { id: 'clothes-one-piece', name: '连体', parentCategoryId: 'clothes' },
+  { id: 'clothes-accessory', name: '配饰', parentCategoryId: 'clothes' },
+];
 export function isValidHexColor(value: string) { return /^#[0-9A-Fa-f]{6}$/.test(value.trim()); }
 export function normalizeModuleColor(value?: string) { return value && isValidHexColor(value) ? value.trim().toUpperCase() : DEFAULT_MODULE_COLOR; }
 export function moduleColorTextColor(value?: string) {
@@ -61,6 +83,9 @@ export function directChildren(containers: Container[], roomId: string, containe
 export function directItems(items: Item[], roomId: string, containerId?: string) {
   return items.filter(i => i.roomId === roomId && i.containerId === containerId);
 }
+export function itemUsesGrid(item: Pick<Item, 'containerId'>, containers: Pick<Container, 'id' | 'level'>[]) {
+  return item.containerId !== undefined && containers.some(container => container.id === item.containerId && container.level === 3);
+}
 export function containerDescendants(containers: Container[], containerId: string) {
   const ids = new Set<string>([containerId]);
   let changed = true;
@@ -83,8 +108,23 @@ export function removeContainerContents(containers: Container[], items: Item[], 
   };
 }
 export function matchesCategory(item: Pick<Item, 'categoryId'>, categoryId?: string) { return !categoryId || item.categoryId === categoryId; }
-export function filterItems<T extends Pick<Item, 'categoryId'> & { expiry?: string }>(items: T[], filter: Filter, categoryId?: string, now = new Date()) {
-  return items.filter(item => matchesCategory(item, categoryId) && matchesFilter(item as unknown as Item, filter, now));
+export function matchesSubcategory(item: Pick<Item, 'subcategoryId'>, subcategoryId?: string) { return !subcategoryId || item.subcategoryId === subcategoryId; }
+export function filterItems<T extends Pick<Item, 'categoryId' | 'subcategoryId'> & { expiry?: string }>(items: T[], filter: Filter, categoryId?: string, now = new Date(), subcategoryId?: string) {
+  return items.filter(item => matchesCategory(item, categoryId) && matchesSubcategory(item, subcategoryId) && matchesFilter(item as unknown as Item, filter, now));
+}
+export function removeSubcategoryAndMaybeCategory<T extends Pick<Item, 'categoryId' | 'subcategoryId'>>(categories: Category[], subcategories: Subcategory[], items: T[], subcategoryId: string) {
+  const target = subcategories.find(subcategory => subcategory.id === subcategoryId);
+  if (!target) return { categories, subcategories, items };
+  const remainingSubcategories = subcategories.filter(subcategory => subcategory.id !== subcategoryId);
+  const removeClothing = target.parentCategoryId === 'clothes' && !remainingSubcategories.some(subcategory => subcategory.parentCategoryId === 'clothes');
+  const nextCategories = removeClothing ? categories.filter(category => category.id !== 'clothes') : categories;
+  const nextItems = items.map(item => {
+    const shouldClearCategory = removeClothing && item.categoryId === 'clothes';
+    if (item.subcategoryId !== subcategoryId && !shouldClearCategory) return item;
+    const { subcategoryId: _subcategoryId, ...withoutSubcategory } = item;
+    return shouldClearCategory ? { ...withoutSubcategory, categoryId: 'uncategorized' } : withoutSubcategory;
+  });
+  return { categories: nextCategories, subcategories: removeClothing ? remainingSubcategories.filter(subcategory => subcategory.parentCategoryId !== 'clothes') : remainingSubcategories, items: nextItems };
 }
 export function removeHomeContents<T extends { id: string }, R extends { id: string; homeId: string }, C extends { id: string; roomId: string }, I extends { id: string; roomId: string }>(data: { homes: T[]; rooms: R[]; containers: C[]; items: I[] }, homeId: string, requireRemaining = false) {
   if (requireRemaining && data.homes.length <= 1) return { error: '至少保留一个家' } as const;
@@ -119,8 +159,8 @@ export function createInitialData() {
   ];
   const items: Item[] = [
     { id: 'tea', name: '乌龙茶', roomId: 'kitchen', containerId: 'drawer', categoryId: 'drink', cell: 18, expiry: localDate(expiry), reminderDays: 7 },
-    { id: 'bandage', name: '创可贴', roomId: 'bedroom', categoryId: 'medicine', cell: 5, reminderDays: 7 },
+    { id: 'bandage', name: '创可贴', roomId: 'bedroom', categoryId: 'medicine', reminderDays: 7 },
   ];
-  const categories: Category[] = [['food', '食品'], ['drink', '饮品'], ['medicine', '药品'], ['cleaning', '清洁用品'], ['tools', '工具'], ['documents', '文件'], ['other', '其他'], ['uncategorized', '未分类']].map(([id, name]) => ({ id, name, isSystem: id === 'uncategorized' }));
-  return { homes, rooms, containers, items, categories };
+  const categories: Category[] = [['food', '食物'], ['drink', '饮品'], ['medicine', '药品'], ['cleaning', '清洁用品'], ['clothes', '衣物'], ['tools', '工具'], ['documents', '文件'], ['other', '其他'], ['uncategorized', '未分类']].map(([id, name]) => ({ id, name, isSystem: id === 'uncategorized', allowSubcategories: id !== 'uncategorized' }));
+  return { homes, rooms, containers, items, categories, subcategories: DEFAULT_SUBCATEGORIES.map(subcategory => ({ ...subcategory })) };
 }

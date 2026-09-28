@@ -5,8 +5,37 @@ test('multiple homes, global search, scoped navigation and empty last room', asy
   await page.goto('/');
   await expect(page.getByRole('button', { name: '全部物品 2', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '30 天内过期 1', exact: true }).click();
+  const monthCard = page.getByTestId('expiry-card-month');
+  const weekCard = page.getByTestId('expiry-card-week');
+  await expect(page.getByRole('button', { name: '30 天内过期 1', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: '7 天内过期 0', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => monthCard.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  await expect.poll(() => weekCard.evaluate(element => Number(getComputedStyle(element).opacity))).toBeLessThan(1);
+  await expect(page.getByTestId('expiry-items-panel-month')).toBeVisible();
+  const statsBox = await page.getByTestId('expiry-stats-grid').boundingBox();
+  const expiryPanel = page.getByTestId('expiry-items-panel-month');
+  const panelBox = await expiryPanel.boundingBox();
+  const expiryHeading = expiryPanel.getByText('到期物品 · 30 天内过期', { exact: true });
+  const headingBox = await expiryHeading.boundingBox();
+  const expiryItem = expiryPanel.getByRole('button', { name: '查看物品 乌龙茶', exact: true });
+  const itemBox = await expiryItem.boundingBox();
+  expect(statsBox && panelBox && panelBox.y - (statsBox.y + statsBox.height)).toBeGreaterThanOrEqual(23);
+  expect(headingBox && itemBox && itemBox.y - (headingBox.y + headingBox.height)).toBeGreaterThanOrEqual(11);
+  await expect(page.getByText('到期物品 · 30 天内过期', { exact: true })).toBeVisible();
+  await expect(page.getByText('到期提醒', { exact: true })).toBeVisible();
+  await expect(page.getByText('家里的物品', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '查看物品 乌龙茶' })).toBeVisible();
   await expect(page.getByRole('button', { name: '查看物品 创可贴' })).toHaveCount(0);
+  await page.getByRole('button', { name: '30 天内过期 1', exact: true }).click();
+  await expect(page.getByRole('button', { name: '30 天内过期 1', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByText('到期物品 · 30 天内过期', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '7 天内过期 0', exact: true }).click();
+  await expect(page.getByRole('button', { name: '7 天内过期 0', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('到期物品 · 7 天内过期', { exact: true })).toBeVisible();
+  await expect(page.getByText('暂无物品', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '全部物品 2', exact: true }).click();
+  await expect(page.getByText('家里的物品', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '首页', exact: true }).click();
   await page.getByRole('tab', { name: '房间', exact: true }).click();
   await expect(page.getByText(/把每个角落都放回它该在的地方/)).toBeVisible();
   await expect(page.getByRole('button', { name: '打开房间 厨房' })).toBeVisible();
@@ -135,6 +164,144 @@ test('home actions appear before expiry reminders', async ({ page }) => {
     .filter((value, index, values) => values.indexOf(value) === index));
   expect(order.indexOf('记录物品')).toBeLessThan(order.indexOf('搜索所有家的物品'));
   expect(order.indexOf('搜索所有家的物品')).toBeLessThan(order.indexOf('到期提醒'));
+});
+
+test('creates a room with a preset grid size', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: '房间', exact: true }).click();
+  await page.getByRole('button', { name: '新增房间', exact: true }).click();
+  await page.getByRole('textbox', { name: '名称', exact: true }).fill('大储物间');
+  await page.getByRole('radio', { name: '10×10', exact: true }).click();
+  await page.getByRole('button', { name: '保存名称', exact: true }).click();
+  await page.getByRole('button', { name: '打开房间 大储物间', exact: true }).click();
+  await expect(page.locator('[data-testid^="cell-"]')).toHaveCount(100);
+  await expect(page.getByText(/10×10/).first()).toBeVisible();
+});
+
+test('record item form keeps balanced group spacing', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '记录物品', exact: true }).click();
+  const form = page.getByTestId('item-form-stack');
+  const roomSection = page.getByTestId('item-form-section-room');
+  await expect(form).toBeVisible();
+  await expect(roomSection).toBeVisible();
+  await expect(form).toHaveCSS('gap', '16px');
+  await expect(roomSection).toHaveCSS('gap', '8px');
+  await page.getByRole('radio', { name: '厨房', exact: true }).click();
+  await expect(page.getByTestId('item-form-section-location')).toBeVisible();
+  await expect(page.getByTestId('item-form-section-location')).toHaveCSS('gap', '8px');
+  await expect(page.getByTestId('item-form-section-category')).toHaveCSS('gap', '8px');
+  await expect(page.getByTestId('item-form-section-expiry')).toHaveCSS('gap', '8px');
+});
+
+test('manages clothing subcategories and records an item with a child category', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: '设置', exact: true }).click();
+  await expect(page.getByText('食物', { exact: true })).toBeVisible();
+  await expect(page.getByText('衣物', { exact: true })).toBeVisible();
+  await expect(page.getByText('上衣', { exact: true })).toBeHidden();
+  await page.getByRole('button', { name: '展开二级分类 衣物', exact: true }).click();
+  await expect(page.getByText('上衣', { exact: true })).toBeVisible();
+  await expect(page.getByText('上衣', { exact: true })).toHaveCSS('color', 'rgb(61, 34, 15)');
+  await expect(page.getByText('上衣', { exact: true }).locator('..')).toHaveCSS('background-color', 'rgb(255, 250, 244)');
+  await page.getByRole('button', { name: '收起二级分类 衣物', exact: true }).click();
+  await expect(page.getByText('上衣', { exact: true })).toBeHidden();
+  await page.getByRole('button', { name: '展开二级分类 衣物', exact: true }).click();
+  await page.getByRole('button', { name: '新增衣物二级分类', exact: true }).click();
+  await page.getByRole('textbox', { name: '名称', exact: true }).fill('袜类');
+  await page.getByRole('button', { name: '保存二级分类', exact: true }).click();
+  await expect(page.getByText('袜类', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '修改二级分类 袜类', exact: true }).click();
+  await page.getByRole('textbox', { name: '名称', exact: true }).fill('袜子');
+  await page.getByRole('button', { name: '保存二级分类', exact: true }).click();
+  await expect(page.getByText('袜子', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '首页', exact: true }).click();
+  await page.getByRole('button', { name: '记录物品', exact: true }).click();
+  await page.getByRole('textbox', { name: '物品名称', exact: true }).fill('白色上衣');
+  await page.getByRole('radio', { name: '卧室', exact: true }).click();
+  await page.getByRole('radio', { name: '衣物', exact: true }).click();
+  await page.getByRole('radio', { name: '上衣', exact: true }).click();
+  await page.getByRole('button', { name: '保存物品', exact: true }).click();
+  await page.getByRole('tab', { name: '物品', exact: true }).click();
+  await page.getByRole('radio', { name: '衣物', exact: true }).click();
+  await page.getByRole('radio', { name: '上衣', exact: true }).click();
+  await expect(page.getByRole('button', { name: '查看物品 白色上衣', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '首页', exact: true }).click();
+  await page.getByRole('textbox', { name: '搜索所有家的物品' }).fill('上衣');
+  await expect(page.getByRole('button', { name: '查看物品 白色上衣', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '设置', exact: true }).click();
+  await page.getByRole('button', { name: '删除二级分类 上衣', exact: true }).click();
+  await page.getByRole('button', { name: '确认删除', exact: true }).click();
+  await expect(page.getByRole('button', { name: '删除二级分类 上衣', exact: true })).toHaveCount(0);
+  for (const name of ['下衣', '连体', '配饰', '袜子']) {
+    await page.getByRole('button', { name: `删除二级分类 ${name}`, exact: true }).click();
+    await page.getByRole('button', { name: '确认删除', exact: true }).click();
+  }
+  await expect(page.getByText('衣物', { exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: '首页', exact: true }).click();
+  await page.getByRole('textbox', { name: '搜索所有家的物品' }).fill('衣物');
+  await expect(page.getByRole('button', { name: '查看物品 白色上衣', exact: true })).toHaveCount(0);
+});
+
+test('category titles and arrows toggle the same group and settings reuse secondary chips', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: '设置', exact: true }).click();
+
+  const clothingToggle = page.getByRole('button', { name: '展开二级分类 衣物', exact: true });
+  await page.getByTestId('category-toggle-arrow-clothes').click();
+  await expect(page.getByLabel('上衣', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('上衣', { exact: true })).toHaveCSS('background-color', 'rgb(255, 250, 244)');
+  await expect(page.getByLabel('上衣', { exact: true })).toHaveCSS('border-color', 'rgb(232, 220, 203)');
+
+  const collapseToggle = page.getByRole('button', { name: '收起二级分类 衣物', exact: true });
+  await collapseToggle.getByText('衣物', { exact: true }).click();
+  await expect(page.getByLabel('上衣', { exact: true })).toBeHidden();
+});
+
+test('record form exposes child categories and clears them when changing the parent', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '记录物品', exact: true }).click();
+  await page.getByRole('radio', { name: '食物', exact: true }).click();
+  const staple = page.getByRole('radio', { name: '主食', exact: true });
+  await expect(staple).toBeVisible();
+  await staple.click();
+  await expect(staple).toHaveAttribute('aria-checked', 'true');
+  await expect(staple).toHaveCSS('border-width', '2px');
+  await expect(staple).toHaveCSS('background-color', 'rgb(230, 210, 208)');
+  await expect(staple).toHaveCSS('border-color', 'rgb(172, 133, 132)');
+  await page.getByRole('radio', { name: '衣物', exact: true }).click();
+  await expect(staple).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: '上衣', exact: true })).toBeVisible();
+});
+
+test('category editor controls whether an empty category can add children', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: '设置', exact: true }).click();
+  await page.getByRole('button', { name: '修改分类 饮品', exact: true }).click();
+  const capability = page.getByLabel('允许添加二级分类', { exact: true });
+  await expect(capability).toBeChecked();
+  await capability.click();
+  await page.getByRole('button', { name: '保存名称', exact: true }).click();
+  await expect(page.getByRole('button', { name: '展开二级分类 饮品', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '新增饮品二级分类', exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: '修改分类 饮品', exact: true }).click();
+  await page.getByLabel('允许添加二级分类', { exact: true }).click();
+  await page.getByRole('button', { name: '保存名称', exact: true }).click();
+  await page.getByRole('button', { name: '展开二级分类 饮品', exact: true }).click();
+  await page.getByRole('button', { name: '新增饮品二级分类', exact: true }).click();
+  await page.getByRole('textbox', { name: '名称', exact: true }).fill('茶类');
+  await page.getByRole('button', { name: '保存二级分类', exact: true }).click();
+  await expect(page.getByText('茶类', { exact: true })).toBeVisible();
+});
+
+test('category editor prevents disabling a category that still has children', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: '设置', exact: true }).click();
+  await page.getByRole('button', { name: '修改分类 食物', exact: true }).click();
+  await page.getByLabel('允许添加二级分类', { exact: true }).click();
+  await page.getByRole('button', { name: '保存名称', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('请先删除全部二级分类');
 });
 
 for (const width of [320, 390, 1200]) test(`square grid and screenshots at ${width}`, async ({ page }) => {
