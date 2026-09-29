@@ -8,6 +8,11 @@ test('encodes and decodes all app collections without losing nested layout data'
   assert.deepEqual(decodeSnapshot(encodeSnapshot(input)), input);
 });
 
+test('preserves optional item image URI', () => {
+  const input = { ...emptySnapshot(), items: [{ ...emptySnapshot().items[0], imageUri: 'data:image/png;base64,abc' }] };
+  assert.equal(decodeSnapshot(encodeSnapshot(input)).items[0].imageUri, 'data:image/png;base64,abc');
+});
+
 test('accepts custom room dimensions while preserving layout data', () => {
   const snapshot = decodeSnapshot(JSON.stringify({
     homes: [{ id: 'h', name: '家' }],

@@ -1,6 +1,7 @@
 import type { ReminderLedger } from './reminder-sync';
 import * as SQLite from 'expo-sqlite';
 import { Snapshot, decodeSnapshot, emptySnapshot, encodeSnapshot } from './persistence';
+import { removeItemImage } from './item-image';
 
 const DB_NAME = 'home-whereabouts.db';
 let databasePromise: Promise<SQLite.SQLiteDatabase> | undefined;
@@ -14,7 +15,16 @@ export async function loadSnapshot(): Promise<Snapshot> {
 }
 export async function saveSnapshot(snapshot: Snapshot) {
   const db = await database();
+  const previous = await db.getFirstAsync<{ snapshot: string }>('SELECT snapshot FROM app_state WHERE id = 1');
   await db.runAsync('INSERT OR REPLACE INTO app_state (id, snapshot, updated_at) VALUES (1, ?, ?)', encodeSnapshot(snapshot), new Date().toISOString());
+  // Delete only after the new snapshot is durable; also covers room/home/module deletion.
+  if (previous) {
+    try {
+      const retained = new Set(snapshot.items.map(item => item.imageUri));
+      const obsolete = new Set(decodeSnapshot(previous.snapshot).items.map(item => item.imageUri).filter(uri => uri && !retained.has(uri)));
+      await Promise.all([...obsolete].map(uri => removeItemImage(uri).catch(() => undefined)));
+    } catch { /* Never turn a cleanup failure into loss of a successfully saved snapshot. */ }
+  }
 }
 
 export async function loadReminderLedger(): Promise<ReminderLedger> {

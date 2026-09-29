@@ -1,10 +1,10 @@
+import { ItemImage } from './ItemImage';
 import React, { useState } from 'react';
 import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { localDate, parseDate, remainingDays, type Item } from './domain';
 import { inventoryLabel, needsMaintenance, needsRestock, parseCount, type InventoryType } from './inventory';
 import { Button, Chip, Field, Sheet, colors, s } from './ui';
-
 export function InventoryDateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   return <View style={{ gap: 8 }}><Text style={s.label}>{label}</Text>{Platform.OS === 'web'
@@ -46,7 +46,7 @@ export function InventoryReminders({ items, now, path, onItem, ...actions }: Inv
       {records.map(item => {
         const days = remainingDays(item.maintenanceDate, now) ?? 0;
         const urgent = kind === 'restock' ? item.quantity === 0 : days < 0;
-        return <View key={item.id} testID={`${kind}-${item.id}`} style={s.card}><Pressable accessibilityRole="button" accessibilityLabel={`查看物品 ${item.name}`} onPress={() => onItem(item)} style={{ gap: 8, minHeight: 48 }}><Text style={s.label}>{item.name}</Text><Text style={s.muted}>{path(item)}</Text><InventorySummary item={item} /></Pressable>
+        return <View key={item.id} testID={`${kind}-${item.id}`} style={s.card}><Pressable accessibilityRole="button" accessibilityLabel={`查看物品 ${item.name}`} onPress={() => onItem(item)} style={{ gap: 8, minHeight: 48 }}><View style={s.row}><ItemImage uri={item.imageUri} /><Text style={[s.label, { flex: 1 }]}>{item.name}</Text></View><Text style={s.muted}>{path(item)}</Text><InventorySummary item={item} /></Pressable>
           <Text style={[s.muted, { color: urgent ? '#A34E32' : '#80602C' }]}>{kind === 'restock' ? `库存线 ${item.restockThreshold} ${item.unit} · ${item.quantity === 0 ? '已用完' : '库存不足'}` : days < 0 ? `已逾期 ${-days} 天` : days === 0 ? '今天检修' : `还有 ${days} 天检修`}</Text>
           <InventoryActions item={item} {...actions} />
         </View>;
@@ -71,3 +71,4 @@ export function InventoryActionSheet({ item, kind, onClose, onSave }: { item: It
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}<Button title={kind === 'restock' ? '确认补货' : '确认完成检修'} onPress={save} />
   </Sheet>;
 }
+

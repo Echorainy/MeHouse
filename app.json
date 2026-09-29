@@ -14,6 +14,7 @@
       "**/*"
     ],
     "plugins": [
+      ["expo-image-picker", { "photosPermission": "允许选择照片作为物品图片" }],
       "expo-notifications",
       "@react-native-community/datetimepicker"
     ],

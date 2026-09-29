@@ -13,7 +13,7 @@ export function isValidRoomLayout(layout: RoomLayout | undefined): boolean {
     && layout.cols >= ROOM_DIMENSION_MIN && layout.cols <= ROOM_DIMENSION_MAX;
 }
 export type Container = { id: string; name: string; roomId: string; parentId?: string; level: 2 | 3; cells: number[]; color?: string };
-export type Item = InventoryFields & { id: string; name: string; roomId: string; containerId?: string; categoryId: string; subcategoryId?: string; cell?: number; expiry?: string; reminderDays: number };
+export type Item = InventoryFields & { id: string; name: string; roomId: string; containerId?: string; categoryId: string; subcategoryId?: string; cell?: number; expiry?: string; reminderDays: number; imageUri?: string };
 export type Category = { id: string; name: string; isSystem: boolean; allowSubcategories: boolean };
 export type Subcategory = { id: string; name: string; parentCategoryId: string };
 export type Location = { roomId: string; containerId?: string };

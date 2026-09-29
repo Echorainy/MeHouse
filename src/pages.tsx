@@ -1,5 +1,6 @@
 import { InventoryActions, InventorySummary, type InventoryCallbacks } from './InventoryUI';
 import React, { useRef, useState } from 'react';
+import { ItemImage } from './ItemImage';
 import { Animated, Platform, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, View, ViewStyle } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Container, Filter, Home, Item, Location, Room, DEFAULT_HOME_GREETING, DEFAULT_HOME_NOTE, directChildren, directItems, filterItems, filterLabels, moduleColorTextColor, normalizeModuleColor, remainingDays, statistics } from './domain';
@@ -60,7 +61,7 @@ export function ItemRows({ items, path, categoryName, now, onItem, actions }: { 
     const days = remainingDays(item.expiry, now);
     const status = item.quantity === 0 ? '已用完' : days === null ? '无保质期' : days < 0 ? `已过期 ${-days} 天` : days === 0 ? '今天到期' : `${days} 天后到期`;
     const statusStyle = days !== null && days < 0 ? s.statusExpired : days !== null && days <= 7 ? s.statusSoon : s.statusNormal;
-    return <View key={item.id} style={[s.card, { marginBottom: 10 }]}><Pressable accessibilityRole="button" accessibilityLabel={`查看物品 ${item.name}`} onPress={() => onItem(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}><Icon name="package" color={days !== null && days < 0 ? colors.danger : colors.accent} /><View style={{ flex: 1, gap: 4, minWidth: 0 }}><Text style={s.label} numberOfLines={1}>{item.name}</Text><Text style={s.muted} numberOfLines={1}>{path(item)}</Text><Text style={s.muted} numberOfLines={1}>{categoryName(item.categoryId, item.subcategoryId)}</Text><InventorySummary item={item} /></View><Text style={[statusStyle, { maxWidth: 95 }]}>{status}</Text></Pressable>{actions && <InventoryActions item={item} {...actions} />}</View>;
+    return <View key={item.id} style={[s.card, { marginBottom: 10 }]}><Pressable accessibilityRole="button" accessibilityLabel={`查看物品 ${item.name}`} onPress={() => onItem(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}><ItemImage uri={item.imageUri} color={days !== null && days < 0 ? colors.danger : colors.accent} /><View style={{ flex: 1, gap: 4, minWidth: 0 }}><Text style={s.label} numberOfLines={1}>{item.name}</Text><Text style={s.muted} numberOfLines={1}>{path(item)}</Text><Text style={s.muted} numberOfLines={1}>{categoryName(item.categoryId, item.subcategoryId)}</Text><InventorySummary item={item} /></View><Text style={[statusStyle, { maxWidth: 95 }]}>{status}</Text></Pressable>{actions && <InventoryActions item={item} {...actions} />}</View>;
   })}</View>;
 }
 
@@ -130,7 +131,7 @@ export function Grid({ children, items, layout = { rows: 8, cols: 8 }, preview =
     {width > 0 && Array.from({ length: layout.rows * layout.cols }, (_, cell) => {
       const child = children.find(c => c.cells.includes(cell)); const item = items.find(i => i.cell === cell); const editing = !!editingId; const selected = !!draftCells?.includes(cell);
       return <Pressable key={cell} testID={preview ? undefined : `cell-${cell}`} accessibilityRole={!preview && (child || item || editing) ? 'button' : undefined} accessibilityLabel={editing ? `编辑第 ${cell + 1} 格` : child ? `进入模块 ${child.name}` : item ? `查看物品 ${item.name}` : undefined} disabled={preview || (!editing && !child && !item)} onPress={() => editing ? onToggleCell?.(cell) : child ? onContainer?.(child.id) : item && onItem?.(item)} style={{ position: 'absolute', left: (cell % layout.cols) * size, top: Math.floor(cell / layout.cols) * size, width: size, height: size, borderWidth: .5, borderColor: colors.line, backgroundColor: editing && selected ? normalizeModuleColor(child?.color) : child ? normalizeModuleColor(child.color) : item ? colors.peachSoft : colors.gridEmpty, padding: preview ? 0 : 2, justifyContent: 'center', overflow: 'hidden' }}>
-        {!preview && <Text numberOfLines={2} style={{ fontSize: 10, textAlign: 'center', color: colors.ink }}>{child?.cells[0] === cell ? child.name : item?.name}</Text>}
+        {!child && item?.imageUri && <ItemImage uri={item.imageUri} size={Math.max(1, size - (preview ? 1 : 5))} />}{!preview && (child || !item?.imageUri) && <Text numberOfLines={2} style={{ fontSize: 10, textAlign: 'center', color: colors.ink }}>{child?.cells[0] === cell ? child.name : item?.name}</Text>}
       </Pressable>;
     })}
   </View>;
