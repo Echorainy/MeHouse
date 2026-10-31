@@ -5,6 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { localDate, parseDate, remainingDays, type Item } from './domain';
 import { inventoryLabel, needsMaintenance, needsRestock, parseCount, type InventoryType } from './inventory';
 import { Button, Chip, Field, Sheet, colors, s } from './ui';
+
 export function InventoryDateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   return <View style={{ gap: 8 }}><Text style={s.label}>{label}</Text>{Platform.OS === 'web'
@@ -71,4 +72,5 @@ export function InventoryActionSheet({ item, kind, onClose, onSave }: { item: It
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}<Button title={kind === 'restock' ? '确认补货' : '确认完成检修'} onPress={save} />
   </Sheet>;
 }
+
 

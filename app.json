@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "家里放哪儿",
+    "name": "MeHouse",
     "slug": "home-whereabouts",
     "version": "0.1.0",
     "icon": "./assets/app-icon.png",
@@ -25,3 +25,4 @@
     }
   }
 }
+

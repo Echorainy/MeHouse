@@ -71,6 +71,11 @@ test('multiple homes, global search, scoped navigation and empty last room', asy
   await page.getByRole('textbox', { name: '搜索所有家的物品' }).fill('乌龙茶');
   await expect(page.getByRole('button', { name: '查看物品 乌龙茶' })).toHaveCount(2);
   await expect(page.getByText('周末小屋 → 厨房', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '查看物品 乌龙茶', exact: true }).first().click();
+  await page.getByRole('button', { name: '编辑物品', exact: true }).click();
+  await page.getByRole('textbox', { name: '物品名称', exact: true }).fill('原家乌龙茶');
+  await page.getByRole('button', { name: '保存修改', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('home-whereabouts.snapshot')).items.find(item => item.id === 'tea'))).toMatchObject({ name: '原家乌龙茶', roomId: 'kitchen' });
   await page.getByRole('textbox', { name: '搜索所有家的物品' }).fill('');
   await page.getByRole('button', { name: '选择家庭' }).click();
   await page.getByRole('button', { name: '重命名家庭 周末小屋' }).click();
@@ -99,6 +104,14 @@ test('multiple homes, global search, scoped navigation and empty last room', asy
   await page.getByTestId('item-form-inventory').getByRole('radio', { name: '消耗品', exact: true }).click();
   await page.getByRole('button', { name: '保存物品' }).click();
   await expect(page.getByRole('button', { name: '全部物品 3', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '设置', exact: true }).click();
+  await page.getByRole('button', { name: '删除家庭 我的家', exact: true }).click();
+  await page.getByRole('button', { name: '确认删除', exact: true }).click();
+  await expect(page.getByRole('button', { name: '选择家庭' })).toContainText('山间小屋');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('home-whereabouts.snapshot')).homes.filter(home => home.id === 'home'))).toHaveLength(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('home-whereabouts.snapshot')).homes)).toHaveLength(1);
+  await page.reload();
+  await expect(page.getByRole('button', { name: '选择家庭' })).toContainText('山间小屋');
   expect(errors).toEqual([]);
 });
 
@@ -337,3 +350,4 @@ for (const width of [320, 390, 1200]) test(`square grid and screenshots at ${wid
   expect(boxes[0].y).toBe(boxes[7].y); expect(boxes[8].y).toBeGreaterThan(boxes[7].y);
   await page.screenshot({ path: `test-results/layout-${width}.png`, fullPage: true });
 });
+

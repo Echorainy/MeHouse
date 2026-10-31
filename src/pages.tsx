@@ -60,8 +60,8 @@ export function ItemRows({ items, path, categoryName, now, onItem, actions }: { 
   return <View>{items.map(item => {
     const days = remainingDays(item.expiry, now);
     const status = item.quantity === 0 ? '已用完' : days === null ? '无保质期' : days < 0 ? `已过期 ${-days} 天` : days === 0 ? '今天到期' : `${days} 天后到期`;
-    const statusStyle = days !== null && days < 0 ? s.statusExpired : days !== null && days <= 7 ? s.statusSoon : s.statusNormal;
-    return <View key={item.id} style={[s.card, { marginBottom: 10 }]}><Pressable accessibilityRole="button" accessibilityLabel={`查看物品 ${item.name}`} onPress={() => onItem(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}><ItemImage uri={item.imageUri} color={days !== null && days < 0 ? colors.danger : colors.accent} /><View style={{ flex: 1, gap: 4, minWidth: 0 }}><Text style={s.label} numberOfLines={1}>{item.name}</Text><Text style={s.muted} numberOfLines={1}>{path(item)}</Text><Text style={s.muted} numberOfLines={1}>{categoryName(item.categoryId, item.subcategoryId)}</Text><InventorySummary item={item} /></View><Text style={[statusStyle, { maxWidth: 95 }]}>{status}</Text></Pressable>{actions && <InventoryActions item={item} {...actions} />}</View>;
+    const statusStyle = days !== null && days < 0 ? s.statusExpired : days !== null && days <= 7 ? s.statusWeek : days !== null && days <= 30 ? s.statusSoon : s.statusNormal;
+    return <View key={item.id} style={[s.card, { marginBottom: 10 }]}><Pressable accessibilityRole="button" accessibilityLabel={`查看物品 ${item.name}`} onPress={() => onItem(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}><ItemImage uri={item.imageUri} color={days !== null && days < 0 ? colors.danger : colors.accent} /><View style={{ flex: 1, gap: 4, minWidth: 0 }}><Text style={s.itemTitle} numberOfLines={1}>{item.name}</Text><Text style={s.muted} numberOfLines={1}>{path(item)}</Text><Text style={s.muted} numberOfLines={1}>{categoryName(item.categoryId, item.subcategoryId)}</Text><InventorySummary item={item} /></View><Text style={[statusStyle, { maxWidth: 95 }]}>{status}</Text></Pressable>{actions && <InventoryActions item={item} {...actions} />}</View>;
   })}</View>;
 }
 
@@ -75,7 +75,7 @@ function ExpiryStatCard({ filter, count, tone, selected, hasSelection, onPress }
     animation.start();
     return () => animation.stop();
   }, [hasSelection, motion, selected]);
-  const scale = motion.interpolate({ inputRange: [-1, 0, 1], outputRange: [.96, 1, 1.06] });
+  const scale = motion.interpolate({ inputRange: [-1, 0, 1], outputRange: [.985, 1, 1.02] });
   const opacity = motion.interpolate({ inputRange: [-1, 0, 1], outputRange: [.78, 1, 1] });
   return <Animated.View testID={`expiry-card-${filter}`} style={[s.statCard, tone, { opacity, zIndex: selected ? 2 : 1, transform: [{ scale }] }]}>
     <Pressable {...({ 'aria-pressed': selected } as any)} accessibilityRole="button" accessibilityLabel={`${filterLabels[filter]} ${count}`} accessibilityState={{ selected }} onPress={onPress} style={{ flex: 1, width: '100%', justifyContent: 'center', gap: 3 }}>
@@ -107,7 +107,7 @@ export function HomePage({ home, items, query, setQuery, searchResults, onHomes,
   React.useEffect(() => { setExpandedFilter(undefined); }, [home.id]);
   const animateBack = () => Animated.spring(scale, { toValue: 1, useNativeDriver: Platform.OS !== 'web', tension: 180, friction: 16 }).start();
   const openCopyEditor = () => { animateBack(); setTimeout(() => setEditingCopy(true), 180); };
-  const startPress = () => Animated.timing(scale, { toValue: 1.04, duration: 450, useNativeDriver: Platform.OS !== 'web' }).start();
+  const startPress = () => Animated.timing(scale, { toValue: 1.015, duration: 220, useNativeDriver: Platform.OS !== 'web' }).start();
   return <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
     <Animated.View style={[s.welcome, s.headingRow, { transform: [{ scale }] }]}>
       <Pressable {...({ onContextMenu: openCopyEditor } as any)} accessibilityRole="button" accessibilityLabel="编辑首页问候语" onPressIn={startPress} onPressOut={animateBack} onLongPress={openCopyEditor} delayLongPress={500} style={StyleSheet.absoluteFill} />
@@ -170,3 +170,4 @@ export function LayoutPage({ room, location, containers, items, path, onBack, on
     {!editingId && <><Text style={s.h2}>直属物品</Text>{renderItems(contents)}<Button title="在此位置记录物品" icon="plus" onPress={onAdd} />{(!current || current.level < 3) && <Button title="新增模块" icon="archive" secondary onPress={onCreateContainer} />}</>}
   </ScrollView>;
 }
+
